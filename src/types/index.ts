@@ -12,9 +12,9 @@ export interface Expense {
   amount: number;
   merchant?: string;
   category?: string;
-  date?: string;
+  timestamp: number;  // Unix timestamp in seconds
   participants: string[];
-  payer?: string;
+  payer: string;     // Made required since we use it in calculations
   settled?: boolean;
 }
 
