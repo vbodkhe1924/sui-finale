@@ -1,7 +1,5 @@
 SuiSplit is a decentralized bill-splitting application built on the Sui blockchain. It allows users to easily manage shared expenses and settle balances with their peers using cryptocurrency.
 
-![SuiSplit Banner](docs/banner.png) <!-- You can add a banner image later -->
-
 ## Features
 
 - 🔐 **Wallet Integration**: Seamless connection with Sui wallets
