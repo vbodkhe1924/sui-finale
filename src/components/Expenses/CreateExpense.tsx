@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Loader, DollarSign, Calendar, FileText, MapPin } from 'lucide-react';
+import { Plus, Loader, DollarSign, Calendar, FileText, MapPin, UserPlus } from 'lucide-react';
+import { useWallet } from '../../context/WalletContext';
+import { useWalletKit } from '@mysten/wallet-kit';
+import { expenseService } from '../../services/expenseService';
 import AnimatedInput from './AnimatedInput';
 import AnimatedAvatarSelector from './AnimatedAvatarSelector';
-
+import { toast } from 'react-toastify';
 import { ExpenseCategory } from '../../types';
 
 const CATEGORIES: ExpenseCategory[] = [
@@ -15,13 +18,6 @@ const CATEGORIES: ExpenseCategory[] = [
   'Healthcare',
   'Travel',
   'Other'
-];
-
-const PARTICIPANTS = [
-  { name: 'You', wallet: '0x9cfb...M0CK', color: 'bg-cyan-500' },
-  { name: 'Alice', wallet: '0xAL1C...', color: 'bg-purple-500' },
-  { name: 'Bob', wallet: '0xB0B2...', color: 'bg-green-500' },
-  { name: 'Charlie', wallet: '0xCHRL...', color: 'bg-orange-500' },
 ];
 
 // Animation variants
@@ -49,7 +45,11 @@ const formItemVariants = {
 };
 
 const CreateExpense: React.FC = () => {
+  const { walletAddress, isConnected } = useWallet();
+  const walletKit = useWalletKit();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [participants, setParticipants] = useState<Array<{ name: string; wallet: string; color: string }>>([]);
+  const [newParticipantAddress, setNewParticipantAddress] = useState('');
   const [formData, setFormData] = useState({
     amount: '',
     date: new Date().toISOString().split('T')[0],
@@ -59,14 +59,120 @@ const CreateExpense: React.FC = () => {
     participants: [] as string[]
   });
 
+  useEffect(() => {
+    if (isConnected && walletAddress) {
+      // Add the current user as the first participant
+      setParticipants([
+        { name: 'You', wallet: walletAddress, color: 'bg-cyan-500' }
+      ]);
+      // Also add the current user to the participants list
+      setFormData(prev => ({
+        ...prev,
+        participants: [walletAddress]
+      }));
+    }
+  }, [isConnected, walletAddress]);
+
+  const handleAddParticipant = () => {
+    if (!newParticipantAddress) {
+      toast.error('Please enter a wallet address');
+      return;
+    }
+
+    if (participants.some(p => p.wallet === newParticipantAddress)) {
+      toast.error('This participant is already added');
+      return;
+    }
+
+    // Add new participant
+    const newParticipant = {
+      name: `Participant ${participants.length + 1}`,
+      wallet: newParticipantAddress,
+      color: `bg-${['purple', 'green', 'orange', 'pink', 'yellow', 'blue', 'red'][participants.length % 7]}-500`
+    };
+
+    setParticipants(prev => [...prev, newParticipant]);
+    setNewParticipantAddress('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!isConnected) {
+      toast.error('Please connect your wallet first');
+      return;
+    }
+
+    if (formData.participants.length === 0) {
+      toast.error('Please select at least one participant');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      // Here you would call your blockchain contract
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulated delay
-      console.log('Expense created:', formData);
+      // Get or create group
+      console.log('Checking for existing expense group...');
+      let groupId = await expenseService.getExpenseGroup();
+      
+      if (!groupId) {
+        console.log('No expense group found, creating one...');
+        const groupTx = expenseService.createInitGroupTransaction();
+        
+        // Execute the group creation transaction
+        console.log('Executing group creation transaction...');
+        const txResponse = await walletKit.signAndExecuteTransactionBlock({
+          transactionBlock: groupTx,
+          options: { 
+            showEffects: true,
+            showEvents: true,
+            showObjectChanges: true
+          }
+        });
+        
+        console.log('Group creation transaction completed, getting object ID...');
+        // Wait for transaction confirmation and get the created group ID
+        groupId = await expenseService.getCreatedObjectId(txResponse);
+        
+        if (!groupId) {
+          console.error('Failed to get group ID from transaction response');
+          throw new Error('Failed to create expense group - no group ID returned');
+        }
+      }
+
+      console.log('Using expense group:', groupId);
+
+      // Create the expense transaction
+      console.log('Creating expense transaction...');
+      const tx = expenseService.createExpenseTransaction({
+        amount: parseFloat(formData.amount),
+        date: formData.date,
+        category: formData.category,
+        description: formData.description,
+        merchant: formData.merchant,
+        participants: formData.participants
+      }, groupId);
+
+      // Execute the transaction
+      console.log('Executing expense transaction...');
+      const expenseTxResponse = await walletKit.signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+        options: { 
+          showEffects: true,
+          showEvents: true,
+          showObjectChanges: true
+        }
+      });
+
+      console.log('Expense transaction response:', expenseTxResponse);
+
+      if (!expenseTxResponse.effects?.status?.status === 'success') {
+        console.error('Transaction failed:', expenseTxResponse.effects?.status);
+        throw new Error('Failed to create expense - transaction failed');
+      }
+
+      console.log('Expense created successfully');
+      toast.success('Expense created successfully!');
       
       // Reset form
       setFormData({
@@ -75,10 +181,11 @@ const CreateExpense: React.FC = () => {
         category: '' as ExpenseCategory,
         description: '',
         merchant: '',
-        participants: []
+        participants: walletAddress ? [walletAddress] : []
       });
     } catch (error) {
       console.error('Error creating expense:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to create expense. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -92,6 +199,22 @@ const CreateExpense: React.FC = () => {
         : [...prev.participants, walletAddress]
     }));
   };
+
+  if (!isConnected) {
+    return (
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700"
+      >
+        <div className="text-center text-gray-300">
+          <h2 className="text-xl font-semibold mb-2">Connect Your Wallet</h2>
+          <p>Please connect your wallet to create expenses.</p>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -186,14 +309,38 @@ const CreateExpense: React.FC = () => {
           isValid={formData.merchant.length > 0}
         />
 
+        {/* Add Participant */}
+        <motion.div variants={formItemVariants} custom={4} initial="hidden" animate="visible">
+          <div className="flex gap-4 mb-4">
+            <AnimatedInput
+              icon={<UserPlus className="h-5 w-5 text-white" />}
+              label="Add Participant (Wallet Address)"
+              type="text"
+              value={newParticipantAddress}
+              onChange={e => setNewParticipantAddress(e.target.value)}
+              placeholder="Enter wallet address"
+              isValid={newParticipantAddress.length > 0}
+            />
+            <motion.button
+              type="button"
+              onClick={handleAddParticipant}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="mt-7 px-4 py-2 bg-cyan-500 text-white rounded-lg"
+            >
+              Add
+            </motion.button>
+          </div>
+        </motion.div>
+
         {/* Participants */}
         <motion.div variants={formItemVariants} custom={5} initial="hidden" animate="visible">
           <AnimatedAvatarSelector
-            participants={PARTICIPANTS}
+            participants={participants}
             selected={formData.participants}
             onToggle={wallet => handleParticipantToggle(wallet)}
-            onSelectAll={() => setFormData(prev => ({ ...prev, participants: PARTICIPANTS.map(p => p.wallet) }))}
-            onClear={() => setFormData(prev => ({ ...prev, participants: [] }))}
+            onSelectAll={() => setFormData(prev => ({ ...prev, participants: participants.map(p => p.wallet) }))}
+            onClear={() => setFormData(prev => ({ ...prev, participants: walletAddress ? [walletAddress] : [] }))}
           />
         </motion.div>
 

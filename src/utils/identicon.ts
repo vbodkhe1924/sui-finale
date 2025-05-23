@@ -1,4 +1,4 @@
-import { create } from 'ethereum-blockies';
+import * as blockies from 'ethereum-blockies';
 
 export const generateIdenticon = (address: string): string | null => {
   try {
@@ -8,14 +8,14 @@ export const generateIdenticon = (address: string): string | null => {
     canvas.height = 64;
     
     // Generate the identicon
-    create({
+    blockies.create({
       seed: address.toLowerCase(),
       size: 8,
       scale: 8,
       spotcolor: '#22d3ee',
       bgcolor: '#1f2937',
       color: '#ffffff'
-    }).render(canvas);
+    }, canvas);
     
     // Convert to data URL
     return canvas.toDataURL();

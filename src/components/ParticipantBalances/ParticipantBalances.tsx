@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Loader, ArrowUpDown, Filter, TrendingUp, TrendingDown, Users } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Loader } from 'lucide-react';
+import { useWallet } from '../../context/WalletContext';
+import { useWalletKit } from '@mysten/wallet-kit';
+import { expenseService } from '../../services/expenseService';
 import ParticipantCard from './ParticipantCard';
 import { Participant } from '../../types';
-
-type SortField = 'name' | 'amount';
-type SortDirection = 'asc' | 'desc';
-type FilterType = 'all' | 'pending' | 'settled';
+import { toast } from 'react-toastify';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -25,108 +25,109 @@ const headerVariants = {
   }
 };
 
-const tabVariants = {
-  hidden: { opacity: 0, y: 10 },
-  visible: (custom: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: {
-      delay: custom * 0.1,
-      duration: 0.3
-    }
-  }),
-  hover: { 
-    y: -2,
-    transition: { duration: 0.2 }
-  }
-};
-
-const underlineVariants = {
-  hidden: { scaleX: 0, opacity: 0 },
-  visible: { 
-    scaleX: 1, 
-    opacity: 1,
-    transition: {
-      type: "spring",
-      stiffness: 300,
-      damping: 25
-    }
-  }
-};
-
 const ParticipantBalances: React.FC = () => {
+  const { walletAddress, isConnected } = useWallet();
+  const walletKit = useWalletKit();
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [sortField, setSortField] = useState<SortField>('amount');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [filter, setFilter] = useState<FilterType>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'settled'>('all');
+  const [sortField, setSortField] = useState<'name' | 'amount'>('amount');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
-    // Simulate fetching participants from API/blockchain
     const fetchParticipants = async () => {
+      if (!isConnected) {
+        setParticipants([]);
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       try {
-        // In a real app, this would be an API call to your backend or blockchain
-        // Mock data for demonstration
-        setTimeout(() => {
-          setParticipants([
-            {
-              id: '1',
-              name: 'Alice',
-              walletAddress: '0xAL1C3456789ABCDEF123456789ABCDEF123456789ABCMOCK',
-              amount: 49.99,
-            },
-            {
-              id: '2',
-              name: 'Bob',
-              walletAddress: '0xB0B3456789ABCDEF123456789ABCDEF123456789ABCMOCK',
-              amount: -25.50,
-            },
-            {
-              id: '3',
-              name: 'Charlie',
-              walletAddress: '0xCHARL3456789ABCDEF123456789ABCDEF123456789ABCMOCK',
-              amount: 0,
-            },
-            {
-              id: '4',
-              name: 'David',
-              walletAddress: '0xDAV1D456789ABCDEF123456789ABCDEF123456789ABCMOCK',
-              amount: 25.50,
-            },
-          ]);
+        // Get the expense group
+        const groupId = await expenseService.getExpenseGroup();
+        if (!groupId) {
+          console.log('No expense group found');
+          setParticipants([]);
           setIsLoading(false);
-        }, 1500); // Simulate network delay
+          return;
+        }
+
+        console.log('Using expense group:', groupId);
+
+        // Get participant balances
+        const balances = await expenseService.getParticipantBalances(groupId);
+        console.log('Received balances:', balances);
+        
+        // Convert balances to participant objects
+        const participantList = balances.map((balance, index) => {
+          const participant = {
+            id: balance.address,
+            name: `Participant ${index + 1}`,
+            walletAddress: balance.address,
+            amount: balance.balance,
+            expenses: balance.expenses || [],
+          };
+          console.log(`Created participant ${index + 1}:`, participant);
+          return participant;
+        });
+
+        console.log('Setting participants:', participantList);
+        setParticipants(participantList);
       } catch (error) {
         console.error('Error fetching participants:', error);
+        toast.error('Failed to fetch participant balances');
+      } finally {
         setIsLoading(false);
       }
     };
 
     fetchParticipants();
-  }, []);
+  }, [isConnected]);
 
-  const handleSettlement = (id: string) => {
-    // In a real app, this would trigger a blockchain transaction
-    console.log(`Settling balance with participant ${id}`);
-    // You would call your smart contract here
-  };
+  const handleSettlement = async (participantId: string) => {
+    if (!isConnected) {
+      toast.error('Please connect your wallet first');
+      return;
+    }
 
-  const handleViewDetails = (id: string) => {
-    // In a real app, this would open a modal or navigate to details
-    console.log(`Viewing details for participant ${id}`);
-  };
+    try {
+      const participant = participants.find(p => p.id === participantId);
+      if (!participant) return;
 
-  const toggleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('desc');
+      // Create and execute settlement transaction
+      const tx = expenseService.createSettleExpenseTransaction(participantId, Math.abs(participant.amount));
+      
+      await walletKit.signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+        options: {
+          showEffects: true,
+          showEvents: true,
+        }
+      });
+
+      toast.success('Settlement transaction submitted successfully');
+      
+      // Refresh participant balances
+      const groupId = await expenseService.getExpenseGroup();
+      if (groupId) {
+        const balances = await expenseService.getParticipantBalances(groupId);
+        const updatedParticipants = balances.map((balance, index) => ({
+          id: balance.address,
+          name: `Participant ${index + 1}`,
+          walletAddress: balance.address,
+          amount: balance.balance,
+          expenses: balance.expenses || [],
+        }));
+        setParticipants(updatedParticipants);
+      }
+    } catch (error) {
+      console.error('Error settling expense:', error);
+      toast.error('Failed to settle expense');
     }
   };
 
-  const filteredAndSortedParticipants = useMemo(() => {
+  const filteredAndSortedParticipants = React.useMemo(() => {
     let filtered = [...participants];
     
     if (filter === 'pending') {
@@ -145,17 +146,17 @@ const ParticipantBalances: React.FC = () => {
     });
   }, [participants, sortField, sortDirection, filter]);
 
-  const totalOwed = useMemo(() => 
+  const totalOwed = React.useMemo(() => 
     participants.reduce((sum, p) => sum + (p.amount > 0 ? p.amount : 0), 0),
     [participants]
   );
 
-  const totalDebt = useMemo(() => 
+  const totalDebt = React.useMemo(() => 
     participants.reduce((sum, p) => sum + (p.amount < 0 ? Math.abs(p.amount) : 0), 0),
     [participants]
   );
 
-  const pendingCount = useMemo(() => 
+  const pendingCount = React.useMemo(() => 
     participants.filter(p => p.amount !== 0).length,
     [participants]
   );
@@ -181,74 +182,23 @@ const ParticipantBalances: React.FC = () => {
               </span>
             </h2>
             <div className="flex flex-wrap items-center gap-4">
-              <motion.div 
-                className="flex items-center space-x-2 bg-gray-700/30 rounded-xl p-1.5 backdrop-blur-sm"
-                variants={tabVariants}
-                initial="hidden"
-                animate="visible"
-              >
+              <div className="flex items-center space-x-2 bg-gray-700/30 rounded-xl p-1.5 backdrop-blur-sm">
                 {(['all', 'pending', 'settled'] as const).map((tab, index) => (
-                  <motion.button
+                  <button
                     key={tab}
-                    custom={index}
-                    variants={tabVariants}
-                    whileHover="hover"
                     onClick={() => setFilter(tab)}
                     className={`
                       relative px-4 py-2 rounded-lg text-sm font-medium transition-colors
                       ${filter === tab 
-                        ? 'text-cyan-400' 
-                        : 'text-gray-300 hover:text-white'
+                        ? 'text-cyan-400 bg-gray-700/50' 
+                        : 'text-gray-300 hover:text-white hover:bg-gray-700/30'
                       }
                     `}
                   >
                     {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                    {filter === tab && (
-                      <motion.div
-                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-400 to-purple-500"
-                        variants={underlineVariants}
-                        layoutId="filterUnderline"
-                      />
-                    )}
-                  </motion.button>
+                  </button>
                 ))}
-              </motion.div>
-              <motion.div 
-                className="flex items-center space-x-2 bg-gray-700/30 rounded-xl p-1.5 backdrop-blur-sm"
-                variants={tabVariants}
-                initial="hidden"
-                animate="visible"
-                custom={3}
-              >
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => toggleSort('name')}
-                  className={`
-                    p-2 rounded-lg transition-colors
-                    ${sortField === 'name' 
-                      ? 'bg-cyan-500/20 text-cyan-400' 
-                      : 'text-gray-300 hover:text-white hover:bg-gray-700/50'
-                    }
-                  `}
-                >
-                  <ArrowUpDown className="h-4 w-4" />
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => toggleSort('amount')}
-                  className={`
-                    p-2 rounded-lg transition-colors
-                    ${sortField === 'amount' 
-                      ? 'bg-cyan-500/20 text-cyan-400' 
-                      : 'text-gray-300 hover:text-white hover:bg-gray-700/50'
-                    }
-                  `}
-                >
-                  <Filter className="h-4 w-4" />
-                </motion.button>
-              </motion.div>
+              </div>
             </div>
           </div>
 
@@ -261,7 +211,7 @@ const ParticipantBalances: React.FC = () => {
             >
               <div className="flex items-center space-x-4">
                 <div className="p-3 rounded-lg bg-green-500/10">
-                  <TrendingUp className="h-6 w-6 text-green-400" />
+                  <span className="text-2xl text-green-400">↗</span>
                 </div>
                 <div>
                   <p className="text-sm text-gray-300">Total Owed</p>
@@ -284,7 +234,7 @@ const ParticipantBalances: React.FC = () => {
             >
               <div className="flex items-center space-x-4">
                 <div className="p-3 rounded-lg bg-red-500/10">
-                  <TrendingDown className="h-6 w-6 text-red-400" />
+                  <span className="text-2xl text-red-400">↘</span>
                 </div>
                 <div>
                   <p className="text-sm text-gray-300">Total Debt</p>
@@ -307,7 +257,7 @@ const ParticipantBalances: React.FC = () => {
             >
               <div className="flex items-center space-x-4">
                 <div className="p-3 rounded-lg bg-cyan-500/10">
-                  <Users className="h-6 w-6 text-cyan-400" />
+                  <span className="text-2xl text-cyan-400">⟳</span>
                 </div>
                 <div>
                   <p className="text-sm text-gray-300">Pending Settlements</p>
@@ -350,17 +300,14 @@ const ParticipantBalances: React.FC = () => {
             animate="visible" 
             className="grid grid-cols-1 gap-6 mt-8"
           >
-            <AnimatePresence mode="popLayout">
-              {filteredAndSortedParticipants.map((participant, index) => (
-                <ParticipantCard
-                  key={participant.id}
-                  participant={participant}
-                  index={index}
-                  onSettle={() => handleSettlement(participant.id)}
-                  onViewDetails={() => handleViewDetails(participant.id)}
-                />
-              ))}
-            </AnimatePresence>
+            {filteredAndSortedParticipants.map((participant, index) => (
+              <ParticipantCard
+                key={participant.id}
+                participant={participant}
+                index={index}
+                onSettle={() => handleSettlement(participant.id)}
+              />
+            ))}
           </motion.div>
         )}
       </motion.div>

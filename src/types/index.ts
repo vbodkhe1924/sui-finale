@@ -3,16 +3,19 @@ export interface Participant {
   name: string;
   walletAddress: string;
   amount: number;
+  expenses: Expense[];
 }
 
 export interface Expense {
   id: string;
-  amount: number;
-  date: string;
-  category: string;
   description: string;
-  merchant: string;
+  amount: number;
+  merchant?: string;
+  category?: string;
+  date?: string;
   participants: string[];
+  payer?: string;
+  settled?: boolean;
 }
 
 export type ExpenseCategory = 

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react';
+import { User, ChevronRight, TrendingUp, TrendingDown, Calendar, DollarSign } from 'lucide-react';
 import WalletAddress from './WalletAddress';
 import AmountBadge from './AmountBadge';
 import { Participant } from '../../types';
@@ -51,14 +51,14 @@ const cardVariants = {
   }
 };
 
-const sparklineVariants = {
-  hidden: { pathLength: 0, opacity: 0 },
+const expenseVariants = {
+  hidden: { opacity: 0, height: 0 },
   visible: { 
-    pathLength: 1, 
-    opacity: 1,
+    opacity: 1, 
+    height: 'auto',
     transition: {
-      duration: 1,
-      ease: "easeInOut"
+      duration: 0.3,
+      ease: "easeOut"
     }
   }
 };
@@ -69,15 +69,11 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({
   onSettle,
   onViewDetails 
 }) => {
+  const [showExpenses, setShowExpenses] = useState(false);
   const identicon = generateIdenticon(participant.walletAddress);
   const isEven = index % 2 === 0;
   const hasPositiveTrend = participant.amount > 0;
   const hasNegativeTrend = participant.amount < 0;
-
-  // Mock sparkline data - in a real app, this would come from transaction history
-  const sparklineData = [0, 2, 1, 4, 3, 5, 4, 6, 5, 7];
-  const maxValue = Math.max(...sparklineData);
-  const normalizedData = sparklineData.map(v => v / maxValue);
 
   return (
     <motion.div 
@@ -93,16 +89,13 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({
         backdrop-blur-sm relative overflow-hidden
         before:absolute before:inset-0 before:bg-gradient-to-r before:from-cyan-500/5 before:to-purple-500/5 before:opacity-0 hover:before:opacity-100 before:transition-opacity
       `}
-      onClick={onViewDetails}
-      role="button"
-      tabIndex={0}
     >
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-[0.02] pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,#fff_1px,transparent_0)] bg-[size:20px_20px]" />
       </div>
 
-      <div className="relative">
+      <div className="flex flex-col space-y-4">
         <div className="flex justify-between items-start">
           <div className="flex items-start space-x-4">
             <motion.div 
@@ -137,63 +130,73 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({
               </motion.div>
             </motion.div>
 
-            <div className="space-y-2">
-              <div>
-                <h3 className="font-bold text-xl text-white tracking-tight">
-                  {participant.name}
-                </h3>
-                <WalletAddress address={participant.walletAddress} />
-              </div>
-
-              {/* Sparkline Graph */}
-              <div className="h-8 w-24 bg-gray-800/50 rounded-lg p-1">
-                <svg
-                  width="100%"
-                  height="100%"
-                  viewBox="0 0 100 30"
-                  preserveAspectRatio="none"
-                  className="text-cyan-400"
-                >
-                  <motion.path
-                    d={normalizedData.reduce((path, value, index) => {
-                      const x = (index / (normalizedData.length - 1)) * 100;
-                      const y = (1 - value) * 30;
-                      return path + (index === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`);
-                    }, '')}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    variants={sparklineVariants}
-                    initial="hidden"
-                    animate="visible"
-                  />
-                </svg>
-              </div>
+            <div>
+              <h3 className="font-bold text-xl text-white tracking-tight">
+                {participant.name}
+              </h3>
+              <WalletAddress address={participant.walletAddress} />
             </div>
           </div>
 
           <div className="flex items-center space-x-4">
             <AmountBadge amount={participant.amount} onSettle={onSettle} />
-            {onViewDetails && (
-              <motion.div
-                whileHover={{ x: 3, color: '#22d3ee' }}
-                className="text-gray-400 p-2 rounded-full hover:bg-gray-700/50 transition-colors"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </motion.div>
-            )}
+            <motion.button
+              whileHover={{ x: showExpenses ? -3 : 3, color: '#22d3ee' }}
+              className="text-gray-400 p-2 rounded-full hover:bg-gray-700/50 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowExpenses(!showExpenses);
+              }}
+            >
+              <ChevronRight 
+                className={`h-5 w-5 transform transition-transform duration-300 ${showExpenses ? 'rotate-90' : ''}`} 
+              />
+            </motion.button>
           </div>
         </div>
 
-        {/* Divider */}
-        <motion.div 
-          className="h-px bg-gradient-to-r from-transparent via-gray-700/50 to-transparent my-4"
-          initial={{ scaleX: 0, opacity: 0 }}
-          animate={{ scaleX: 1, opacity: 1 }}
-          transition={{ delay: 0.3 }}
-        />
+        {/* Expenses List */}
+        <AnimatePresence>
+          {showExpenses && participant.expenses && participant.expenses.length > 0 && (
+            <motion.div
+              variants={expenseVariants}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+              className="mt-4 space-y-3"
+            >
+              <div className="h-px bg-gradient-to-r from-transparent via-gray-700/50 to-transparent" />
+              
+              <div className="space-y-3">
+                {participant.expenses.map(expense => (
+                  <motion.div
+                    key={expense.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700/50"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 rounded-lg bg-gray-700/50">
+                        <DollarSign className="h-4 w-4 text-cyan-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-white">{expense.description}</p>
+                        <div className="flex items-center space-x-2 text-xs text-gray-400">
+                          <Calendar className="h-3 w-3" />
+                          <span>{expense.date}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <span className={`text-sm font-medium ${expense.amount > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      ${Math.abs(expense.amount).toFixed(2)}
+                    </span>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );
