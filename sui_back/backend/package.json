@@ -1,0 +1,19 @@
+{
+  "name": "suisplit-backend",
+  "version": "1.0.0",
+  "description": "Backend for SuiSplit project",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.7.7",
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}

@@ -1,0 +1,161 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .bg-size-200 {
+    background-size: 200% 200%;
+  }
+  
+  .animate-gradient {
+    animation: gradient 8s ease infinite;
+  }
+}
+
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(31, 41, 55, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(34, 211, 238, 0.3);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(34, 211, 238, 0.5);
+}
+
+/* Smooth transitions */
+* {
+  @apply transition-colors duration-200;
+}
+
+/* Card hover effects */
+.hover-card {
+  @apply transition-all duration-300 ease-out;
+}
+
+.hover-card:hover {
+  @apply transform -translate-y-1 shadow-lg;
+}
+
+/* Gradient text animation */
+.animate-gradient-text {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-purple-500 to-cyan-400 bg-size-200 animate-gradient;
+}
+
+/* Loading animation */
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Slide in animation */
+@keyframes slideIn {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out forwards;
+}
+
+/* Background patterns */
+.bg-dots {
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.1) 1px, transparent 0);
+  background-size: 20px 20px;
+}
+
+.bg-grid {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Glass effect */
+.glass {
+  @apply bg-gray-800/80 backdrop-blur-sm border border-gray-700/50;
+}
+
+.glass-hover {
+  @apply hover:bg-gray-800/90 hover:border-gray-700/70 transition-all duration-300;
+}
+
+/* Button styles */
+.btn-primary {
+  @apply px-4 py-2 rounded-lg font-medium text-sm
+    bg-gradient-to-r from-cyan-500 to-purple-500
+    text-white shadow-lg shadow-cyan-500/20
+    hover:shadow-xl hover:shadow-cyan-500/30
+    active:scale-95 transition-all duration-200;
+}
+
+.btn-secondary {
+  @apply px-4 py-2 rounded-lg font-medium text-sm
+    bg-gray-700/50 text-gray-300
+    hover:bg-gray-700 hover:text-white
+    active:scale-95 transition-all duration-200;
+}
+
+/* Card styles */
+.card {
+  @apply rounded-2xl p-6 border border-gray-700/50 shadow-lg
+    bg-gradient-to-br from-gray-800/50 to-gray-800/30
+    backdrop-blur-sm;
+}
+
+.card-hover {
+  @apply hover:shadow-xl hover:border-cyan-500/20
+    hover:scale-[1.02] hover:-translate-y-1
+    transition-all duration-300;
+} 
