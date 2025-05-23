@@ -186,111 +186,23 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Charts */}
-      <motion.div variants={cardVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="max-w-5xl mx-auto">
         <motion.div variants={cardVariants}>
           <Card className="shadow-lg border border-gray-700/50 bg-gradient-to-br from-slate-900 to-slate-800">
             <Title className="text-cyan-300">Monthly Expense Trends</Title>
-            <div className="h-72 mt-6">
+            <div className="h-[400px] mt-6">
               <AnimatedLineChart
                 data={HARDCODED_MONTHLY_DATA.map(d => ({ x: d.date, y: d.expenses }))}
-                color="#6C5CE7"
-                gradientFrom="#6C5CE7"
-                gradientTo="#00D2D3"
-                width={400}
-                height={220}
+                color={CHART_COLORS.secondary.base}
+                gradientFrom={CHART_COLORS.secondary.base}
+                gradientTo={CHART_COLORS.primary.base}
+                width={800}
+                height={350}
               />
             </div>
           </Card>
         </motion.div>
-
-        <motion.div variants={cardVariants}>
-          <Card className="shadow-lg border border-gray-700/50 bg-gradient-to-br from-slate-900 to-slate-800">
-            <Title className="text-purple-400">Recent Expenses Comparison</Title>
-            <BarChart
-              className="h-72 mt-6"
-              data={HARDCODED_MONTHLY_DATA.slice(-3)}
-              index="date"
-              categories={["expenses", "income"]}
-              colors={[CHART_COLORS.secondary.base, CHART_COLORS.primary.base]}
-              valueFormatter={(number) => `$${number.toFixed(2)}`}
-              showAnimation={true}
-              showLegend={true}
-              showGridLines={false}
-              showXAxis={true}
-              showYAxis={true}
-              yAxisWidth={60}
-              customTooltip={({ payload }) => {
-                if (!payload?.length) return null;
-                return (
-                  <div className="rounded-lg border border-gray-700 bg-gray-800 p-2">
-                    <div className="text-sm text-gray-200">{payload[0].payload.date}</div>
-                    {payload.map((category: any, idx: number) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: category.color }}
-                        />
-                        <span className="text-sm capitalize">{category.name}:</span>
-                        <span className="text-sm font-medium text-gray-200">
-                          ${category.value.toFixed(2)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              }}
-            />
-          </Card>
-        </motion.div>
-      </motion.div>
-
-      {/* Donut Chart */}
-      <motion.div variants={cardVariants}>
-        <Card className="shadow-lg border border-gray-700/50 bg-gradient-to-br from-slate-900 to-slate-800">
-          <Title className="text-emerald-400">Participant Debt Distribution</Title>
-          <DonutChart
-            className="h-80 mt-6"
-            data={HARDCODED_DEBTS}
-            category="amount"
-            index="name"
-            valueFormatter={(number) => `$${number.toFixed(2)}`}
-            colors={[
-              CHART_COLORS.primary.base,
-              CHART_COLORS.secondary.base,
-              CHART_COLORS.accent.base,
-            ]}
-            variant="donut"
-            showAnimation={true}
-            showTooltip={true}
-            showLabel={true}
-            label="Total Amount"
-            labelColor="#E2E8F0"
-            valueColor="#E2E8F0"
-            showLegend={true}
-            legendPosition="bottom"
-            customTooltip={({ payload }) => {
-              if (!payload?.length) return null;
-              const data = payload[0];
-              return (
-                <div className="rounded-lg border border-gray-700 bg-gray-800 p-2">
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="w-3 h-3 rounded-full" 
-                      style={{ backgroundColor: data.color }}
-                    />
-                    <span className="text-sm font-medium text-gray-200">
-                      {data.name}
-                    </span>
-                  </div>
-                  <div className="mt-1 text-sm text-gray-200">
-                    ${data.value.toFixed(2)}
-                  </div>
-                </div>
-              );
-            }}
-          />
-        </Card>
-      </motion.div>
+      </div>
     </motion.div>
   );
 };
