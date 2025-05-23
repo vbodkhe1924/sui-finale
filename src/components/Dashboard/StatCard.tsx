@@ -3,7 +3,7 @@ import { motion, useMotionValue, animate } from 'framer-motion';
 
 interface StatCardProps {
   title: string;
-  value: number;
+  value: number | null;
   prefix?: string;
   suffix?: string;
   icon?: React.ReactNode;
@@ -35,13 +35,16 @@ const StatCard: React.FC<StatCardProps> = ({
   // Animated number using framer-motion animate
   const [displayValue, setDisplayValue] = useState(0);
   const motionValue = useMotionValue(0);
+
   useEffect(() => {
-    const controls = animate(motionValue, value, {
-      duration: 1.2,
-      ease: 'easeOut',
-      onUpdate: v => setDisplayValue(v)
-    });
-    return controls.stop;
+    if (value !== null) {
+      const controls = animate(motionValue, value, {
+        duration: 1.2,
+        ease: 'easeOut',
+        onUpdate: v => setDisplayValue(v)
+      });
+      return controls.stop;
+    }
   }, [value]);
 
   // Sparkline SVG
@@ -100,14 +103,18 @@ const StatCard: React.FC<StatCardProps> = ({
             className="flex items-baseline gap-2"
           >
             <span className="text-4xl md:text-5xl font-extrabold text-white tracking-tight">
-              {prefix}{displayValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}{suffix}
+              {value === null ? (
+                <span className="text-3xl">Loading...</span>
+              ) : (
+                <>{prefix}{displayValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}{suffix}</>
+              )}
             </span>
-            {percentChange !== undefined && (
+            {percentChange !== undefined && value !== null && (
               <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold ${percentColor} bg-white/10`}>{percentChange > 0 ? '+' : ''}{percentChange}%</span>
             )}
           </motion.div>
         </div>
-        {sparkline && <div className="ml-2">{sparkline}</div>}
+        {sparkline && value !== null && <div className="ml-2">{sparkline}</div>}
       </div>
     </motion.div>
   );

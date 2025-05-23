@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, ChevronRight, TrendingUp, TrendingDown, Calendar, DollarSign } from 'lucide-react';
+import { User, ChevronRight, TrendingUp, TrendingDown, Calendar, DollarSign, Edit2, Check, X } from 'lucide-react';
 import WalletAddress from './WalletAddress';
 import AmountBadge from './AmountBadge';
 import { Participant } from '../../types';
 import { generateIdenticon } from '../../utils/identicon';
+import { getNickname, setNickname } from '../../utils/nicknames';
+import Avatar from '../common/Avatar';
 
 interface ParticipantCardProps {
   participant: Participant;
@@ -70,10 +72,25 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({
   onViewDetails 
 }) => {
   const [showExpenses, setShowExpenses] = useState(false);
-  const identicon = generateIdenticon(participant.walletAddress);
+  const [isEditing, setIsEditing] = useState(false);
+  const [nickname, setNicknameState] = useState(getNickname(participant.walletAddress) || `Participant ${index + 1}`);
+  const [editValue, setEditValue] = useState(nickname);
   const isEven = index % 2 === 0;
   const hasPositiveTrend = participant.amount > 0;
   const hasNegativeTrend = participant.amount < 0;
+
+  const handleSaveNickname = () => {
+    if (editValue.trim()) {
+      setNickname(participant.walletAddress, editValue.trim());
+      setNicknameState(editValue.trim());
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditValue(nickname);
+    setIsEditing(false);
+  };
 
   return (
     <motion.div 
@@ -98,42 +115,61 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({
       <div className="flex flex-col space-y-4">
         <div className="flex justify-between items-start">
           <div className="flex items-start space-x-4">
-            <motion.div 
-              className="relative"
-              whileHover={{ scale: 1.1, rotate: 5 }}
-              transition={{ type: "spring", stiffness: 400 }}
-            >
-              {identicon ? (
-                <img 
-                  src={identicon} 
-                  alt={`${participant.name}'s avatar`}
-                  className="h-14 w-14 rounded-2xl border-2 border-cyan-500/20 shadow-lg shadow-cyan-500/10"
-                />
-              ) : (
-                <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center border-2 border-cyan-500/20 shadow-lg shadow-cyan-500/10">
-                  <span className="text-xl font-bold text-white">
-                    {participant.name.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-              )}
-              <motion.div
-                className="absolute -bottom-1 -right-1 p-1 rounded-full bg-gray-800 border border-gray-700"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2 }}
-              >
-                {hasPositiveTrend ? (
-                  <TrendingUp className="h-3 w-3 text-green-400" />
-                ) : hasNegativeTrend ? (
-                  <TrendingDown className="h-3 w-3 text-red-400" />
-                ) : null}
-              </motion.div>
-            </motion.div>
+            <Avatar
+              address={participant.walletAddress}
+              name={nickname}
+              size="lg"
+              showTooltip={false}
+            />
 
-            <div>
-              <h3 className="font-bold text-xl text-white tracking-tight">
-                {participant.name}
-              </h3>
+            <div className="flex-1">
+              <div className="flex items-center space-x-2">
+                {isEditing ? (
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      className="bg-gray-700/50 text-white px-2 py-1 rounded-lg text-lg font-bold focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveNickname();
+                        if (e.key === 'Escape') handleCancelEdit();
+                      }}
+                    />
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleSaveNickname}
+                      className="p-1 text-green-400 hover:text-green-300"
+                    >
+                      <Check className="h-5 w-5" />
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleCancelEdit}
+                      className="p-1 text-red-400 hover:text-red-300"
+                    >
+                      <X className="h-5 w-5" />
+                    </motion.button>
+                  </div>
+                ) : (
+                  <>
+                    <h3 className="font-bold text-xl text-white tracking-tight">
+                      {nickname}
+                    </h3>
+                    <motion.button
+                      whileHover={{ scale: 1.1, color: '#22d3ee' }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setIsEditing(true)}
+                      className="p-1 text-gray-400 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </motion.button>
+                  </>
+                )}
+              </div>
               <WalletAddress address={participant.walletAddress} />
             </div>
           </div>

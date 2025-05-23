@@ -8,6 +8,8 @@ import AnimatedInput from './AnimatedInput';
 import AnimatedAvatarSelector from './AnimatedAvatarSelector';
 import { toast } from 'react-toastify';
 import { ExpenseCategory } from '../../types';
+import NicknamePromptModal from '../Modal/NicknamePromptModal';
+import { setNickname } from '../../utils/nicknames';
 
 const CATEGORIES: ExpenseCategory[] = [
   'Food & Dining',
@@ -50,6 +52,8 @@ const CreateExpense: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [participants, setParticipants] = useState<Array<{ name: string; wallet: string; color: string }>>([]);
   const [newParticipantAddress, setNewParticipantAddress] = useState('');
+  const [showNicknameModal, setShowNicknameModal] = useState(false);
+  const [pendingParticipant, setPendingParticipant] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     amount: '',
     date: new Date().toISOString().split('T')[0],
@@ -84,15 +88,28 @@ const CreateExpense: React.FC = () => {
       return;
     }
 
-    // Add new participant
+    // Set the pending participant and show the nickname modal
+    setPendingParticipant(newParticipantAddress);
+    setShowNicknameModal(true);
+    setNewParticipantAddress('');
+  };
+
+  const handleSaveNickname = (nickname: string) => {
+    if (!pendingParticipant) return;
+
+    // Save the nickname
+    setNickname(pendingParticipant, nickname);
+
+    // Add new participant with the nickname
     const newParticipant = {
-      name: `Participant ${participants.length + 1}`,
-      wallet: newParticipantAddress,
+      name: nickname,
+      wallet: pendingParticipant,
       color: `bg-${['purple', 'green', 'orange', 'pink', 'yellow', 'blue', 'red'][participants.length % 7]}-500`
     };
 
     setParticipants(prev => [...prev, newParticipant]);
-    setNewParticipantAddress('');
+    setPendingParticipant(null);
+    setShowNicknameModal(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -362,6 +379,17 @@ const CreateExpense: React.FC = () => {
           )}
         </motion.button>
       </form>
+
+      {/* Nickname Modal */}
+      <NicknamePromptModal
+        isOpen={showNicknameModal}
+        walletAddress={pendingParticipant || ''}
+        onSave={handleSaveNickname}
+        onClose={() => {
+          setShowNicknameModal(false);
+          setPendingParticipant(null);
+        }}
+      />
     </motion.div>
   );
 };

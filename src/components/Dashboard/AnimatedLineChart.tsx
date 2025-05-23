@@ -14,118 +14,224 @@ const AnimatedLineChart: React.FC<AnimatedLineChartProps> = ({
   data,
   width = 400,
   height = 180,
-  color = '#6C5CE7',
-  gradientFrom = '#6C5CE7',
-  gradientTo = '#00D2D3',
+  color = '#00D2D3',
+  gradientFrom = 'rgba(108, 92, 231, 0.5)',
+  gradientTo = 'rgba(0, 210, 211, 0.1)',
 }) => {
-  // Calculate points
-  const maxY = Math.max(...data.map(d => d.y));
-  const minY = Math.min(...data.map(d => d.y));
-  const points = data.map((d, i) => {
-    const x = (i / (data.length - 1)) * (width - 40) + 20;
-    const y = height - 30 - ((d.y - minY) / (maxY - minY || 1)) * (height - 60);
-    return { x, y };
+  // Handle empty data case
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full w-full">
+        <p className="text-gray-400">No data available</p>
+      </div>
+    );
+  }
+
+  // Filter out invalid data points
+  const validData = data.filter(d => typeof d.y === 'number' && !isNaN(d.y));
+
+  if (validData.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full w-full">
+        <p className="text-gray-400">Invalid data points</p>
+      </div>
+    );
+  }
+
+  // Calculate points with padding
+  const padding = { top: 20, right: 20, bottom: 30, left: 40 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  const maxY = Math.max(...validData.map(d => d.y));
+  const minY = Math.min(...validData.map(d => d.y));
+  const yRange = maxY - minY || 1; // Prevent division by zero
+
+  const points = validData.map((d, i) => {
+    const x = padding.left + (i / (validData.length - 1)) * chartWidth;
+    const y = padding.top + chartHeight - ((d.y - minY) / yRange) * chartHeight;
+    return { x: Math.round(x), y: Math.round(y) };
   });
-  const pathD = points.map((p, i) => i === 0 ? `M${p.x},${p.y}` : `L${p.x},${p.y}`).join(' ');
-  const areaD = `${points.map((p, i) => i === 0 ? `M${p.x},${height-30}` : '')} ${points.map(p => `L${p.x},${p.y}`).join(' ')} L${points[points.length-1].x},${height-30} Z`;
+
+  // Generate path strings with explicit commands and tension
+  const linePath = points.reduce((path, point, i) => {
+    if (i === 0) return `M ${point.x} ${point.y}`;
+    const prevPoint = points[i - 1];
+    const tension = 0.3; // Adjust this value to control curve smoothness
+    const controlX1 = prevPoint.x + (point.x - prevPoint.x) * tension;
+    const controlX2 = point.x - (point.x - prevPoint.x) * tension;
+    return `${path} C ${controlX1} ${prevPoint.y}, ${controlX2} ${point.y}, ${point.x} ${point.y}`;
+  }, '');
+
+  const areaPath = `
+    M ${points[0].x} ${height - padding.bottom}
+    L ${points[0].x} ${points[0].y}
+    ${points.slice(1).map((point, i) => {
+      const prevPoint = points[i];
+      const tension = 0.3;
+      const controlX1 = prevPoint.x + (point.x - prevPoint.x) * tension;
+      const controlX2 = point.x - (point.x - prevPoint.x) * tension;
+      return `C ${controlX1} ${prevPoint.y}, ${controlX2} ${point.y}, ${point.x} ${point.y}`;
+    }).join(' ')}
+    L ${points[points.length - 1].x} ${height - padding.bottom}
+    Z
+  `.trim();
 
   // Tooltip state
   const [hovered, setHovered] = useState<number | null>(null);
 
+  // Generate grid lines and labels
+  const yAxisTicks = 5;
+  const gridLines = Array.from({ length: yAxisTicks }).map((_, i) => {
+    const y = padding.top + (chartHeight * i) / (yAxisTicks - 1);
+    const value = maxY - (yRange * i) / (yAxisTicks - 1);
+    return { y, value };
+  });
+
   return (
-    <svg width={width} height={height} className="w-full h-48">
-      {/* Gradient */}
+    <svg 
+      width={width} 
+      height={height} 
+      className="w-full h-full"
+      style={{ overflow: 'visible' }}
+    >
+      {/* Multiple gradients for visual effects */}
       <defs>
         <linearGradient id="line-gradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={gradientFrom} stopOpacity={0.7} />
+          <stop offset="0%" stopColor={gradientFrom} stopOpacity={0.5} />
           <stop offset="100%" stopColor={gradientTo} stopOpacity={0.1} />
         </linearGradient>
+        <linearGradient id="line-stroke" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#00D2D3" />
+          <stop offset="100%" stopColor="#6C5CE7" />
+        </linearGradient>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+          <feMerge>
+            <feMergeNode in="coloredBlur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
       </defs>
-      {/* Grid lines */}
-      {[0, 0.25, 0.5, 0.75, 1].map((t, i) => (
-        <line
-          key={i}
-          x1={20}
-          x2={width-20}
-          y1={height-30-t*(height-60)}
-          y2={height-30-t*(height-60)}
-          stroke="#fff"
-          strokeOpacity={0.07}
-          strokeWidth={1}
-        />
+
+      {/* Grid lines and labels */}
+      {gridLines.map((tick, i) => (
+        <g key={i}>
+          <line
+            x1={padding.left}
+            x2={width - padding.right}
+            y1={tick.y}
+            y2={tick.y}
+            stroke="#ffffff"
+            strokeOpacity={0.1}
+            strokeWidth={1}
+            strokeDasharray="4,4"
+          />
+          <text
+            x={padding.left - 10}
+            y={tick.y}
+            textAnchor="end"
+            alignmentBaseline="middle"
+            fill="#94A3B8"
+            fontSize="12"
+          >
+            ${tick.value.toFixed(2)}
+          </text>
+        </g>
       ))}
-      {/* Area fill */}
+
+      {/* X-axis labels */}
+      {validData.map((d, i) => (
+        <text
+          key={i}
+          x={points[i].x}
+          y={height - padding.bottom + 20}
+          textAnchor="middle"
+          fill="#94A3B8"
+          fontSize="12"
+        >
+          {d.x}
+        </text>
+      ))}
+
+      {/* Area fill with gradient */}
       <motion.path
-        d={areaD}
+        d={areaPath}
         fill="url(#line-gradient)"
-        initial={{ pathLength: 0 }}
-        animate={{ pathLength: 1 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ duration: 1.2, ease: 'easeOut' }}
       />
-      {/* Line */}
+
+      {/* Animated line with gradient stroke */}
       <motion.path
-        d={pathD}
+        d={linePath}
         fill="none"
-        stroke={color}
+        stroke="url(#line-stroke)"
         strokeWidth={3}
         strokeLinejoin="round"
         strokeLinecap="round"
-        initial={{ pathLength: 0 }}
-        animate={{ pathLength: 1 }}
+        filter="url(#glow)"
+        initial={{ pathLength: 0, opacity: 0 }}
+        animate={{ pathLength: 1, opacity: 1 }}
         transition={{ duration: 1.2, ease: 'easeOut' }}
       />
-      {/* Data points */}
+
+      {/* Data points with glow effect */}
       {points.map((p, i) => (
-        <motion.circle
-          key={i}
-          cx={p.x}
-          cy={p.y}
-          r={hovered === i ? 7 : 4}
-          fill={color}
-          stroke="#fff"
-          strokeWidth={2}
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 0.2 + i * 0.05, type: 'spring', stiffness: 300 }}
-          onMouseEnter={() => setHovered(i)}
-          onMouseLeave={() => setHovered(null)}
-        />
-      ))}
-      {/* Tooltips */}
-      {hovered !== null && (
-        <g>
-          <rect
-            x={points[hovered].x - 32}
-            y={points[hovered].y - 38}
-            width={64}
-            height={28}
-            rx={8}
-            fill="#222f3e"
-            opacity={0.95}
-            stroke={color}
-            strokeWidth={1}
+        <g key={i}>
+          <motion.circle
+            cx={p.x}
+            cy={p.y}
+            r={hovered === i ? 6 : 4}
+            fill={color}
+            stroke="#fff"
+            strokeWidth={2}
+            filter="url(#glow)"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2 + i * 0.05, type: 'spring', stiffness: 300 }}
+            onMouseEnter={() => setHovered(i)}
+            onMouseLeave={() => setHovered(null)}
+            style={{ cursor: 'pointer' }}
           />
-          <text
-            x={points[hovered].x}
-            y={points[hovered].y - 22}
-            textAnchor="middle"
-            fontSize={13}
-            fill="#fff"
-            fontWeight="bold"
-          >
-            {data[hovered].y}
-          </text>
-          <text
-            x={points[hovered].x}
-            y={points[hovered].y - 8}
-            textAnchor="middle"
-            fontSize={11}
-            fill="#00D2D3"
-          >
-            {data[hovered].x}
-          </text>
+          {/* Enhanced tooltip */}
+          {hovered === i && (
+            <g>
+              <rect
+                x={p.x - 45}
+                y={p.y - 45}
+                width={90}
+                height={35}
+                rx={8}
+                fill="rgba(17, 25, 40, 0.95)"
+                stroke={color}
+                strokeWidth={1}
+                filter="url(#glow)"
+              />
+              <text
+                x={p.x}
+                y={p.y - 30}
+                textAnchor="middle"
+                fill="#fff"
+                fontSize="12"
+                fontWeight="bold"
+              >
+                ${validData[i].y.toFixed(2)}
+              </text>
+              <text
+                x={p.x}
+                y={p.y - 18}
+                textAnchor="middle"
+                fill={color}
+                fontSize="10"
+              >
+                {validData[i].x}
+              </text>
+            </g>
+          )}
         </g>
-      )}
+      ))}
     </svg>
   );
 };

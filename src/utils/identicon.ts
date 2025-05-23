@@ -1,26 +1,36 @@
-import * as blockies from 'ethereum-blockies';
+// Function to generate a deterministic color from a string
+const stringToColor = (str: string): string => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  // Generate HSL values
+  const h = Math.abs(hash % 360);  // Hue
+  const s = 70 + (hash % 20);      // Saturation between 70-90%
+  const l = 45 + (hash % 10);      // Lightness between 45-55%
+  
+  return `hsl(${h}, ${s}%, ${l}%)`;
+};
 
-export const generateIdenticon = (address: string): string | null => {
+// Function to get initials from a string
+const getInitials = (str: string): string => {
+  return str
+    .split(' ')
+    .map(word => word[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+};
+
+export const generateIdenticon = (address: string): { color: string; initials: string } => {
   try {
-    // Create a canvas element
-    const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
+    const color = stringToColor(address);
+    const initials = getInitials(address.slice(2, 6)); // Use part of the address as "name"
     
-    // Generate the identicon
-    blockies.create({
-      seed: address.toLowerCase(),
-      size: 8,
-      scale: 8,
-      spotcolor: '#22d3ee',
-      bgcolor: '#1f2937',
-      color: '#ffffff'
-    }, canvas);
-    
-    // Convert to data URL
-    return canvas.toDataURL();
+    return { color, initials };
   } catch (error) {
-    console.error('Error generating identicon:', error);
-    return null;
+    console.error('Error generating avatar:', error);
+    return { color: '#22d3ee', initials: '##' };
   }
 }; 
